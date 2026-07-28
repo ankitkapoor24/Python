@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Aerodynamics: Center of Pressure & Induced Drag</title>
+    <style>
+        :root {
+            --primary: #2c3e50;
+            --accent: #2980b9;
+            --success: #27ae60;
+            --danger: #c0392b;
+            --gold: #d4af37;
+            --bg: #f4f7f6;
+        }
+        body { font-family: 'Segoe UI', Tahoma, sans-serif; background: var(--bg); margin: 0; padding: 20px; }
+        .quiz-card { max-width: 850px; margin: auto; background: #fff; border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); overflow: hidden; }
+        .header { background: var(--primary); color: #fff; padding: 25px; display: flex; justify-content: space-between; align-items: center; }
+        #timer { font-size: 1.6rem; font-weight: 800; background: rgba(0,0,0,0.3); padding: 8px 18px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.2); }
+        .progress-track { height: 10px; background: #eee; width: 100%; }
+        #progress-fill { height: 100%; background: var(--success); width: 0%; transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1); }
+        .content { padding: 40px; min-height: 400px; }
+        .category { font-size: 0.9rem; font-weight: bold; color: var(--accent); letter-spacing: 1.5px; margin-bottom: 15px; text-transform: uppercase; }
+        .question { font-size: 1.35rem; font-weight: 700; color: #333; line-height: 1.4; margin-bottom: 30px; }
+        .options-grid { display: grid; gap: 15px; }
+        .option { padding: 18px 25px; border: 2px solid #eaedf0; border-radius: 10px; cursor: pointer; transition: all 0.2s; font-size: 1.1rem; color: #444; position: relative; }
+        .option:hover { background: #f8f9fa; border-color: var(--accent); transform: translateY(-2px); }
+        .option.selected { border-color: var(--primary); background: #f0f4f8; }
+        
+        /* Feedback Colors */
+        .option.incorrect { background-color: #fceaea !important; border-color: var(--danger) !important; color: var(--danger); }
+        .option.correct-gold { background-color: #fff9e6 !important; border-color: var(--gold) !important; color: #856404; font-weight: bold; }
+        .option.correct-pure { background-color: #eafaf1 !important; border-color: var(--success) !important; color: #1e8449; }
+
+        .explanation { margin-top: 30px; padding: 20px; background: #f1f7ff; border-left: 6px solid var(--accent); display: none; border-radius: 0 8px 8px 0; }
+        .footer { margin-top: 40px; display: flex; gap: 15px; }
+        button { flex: 1; padding: 18px; border: none; border-radius: 8px; cursor: pointer; font-size: 1.1rem; font-weight: 700; transition: 0.3s; }
+        #skip-btn { background: #95a5a6; color: #fff; }
+        #skip-btn:hover { background: #7f8c8d; }
+        #submit-btn { background: var(--primary); color: #fff; }
+        #next-btn { background: var(--success); color: #fff; display: none; }
+        #results { display: none; text-align: center; padding: 80px 40px; }
+        .skipped-tag { color: #e67e22; font-weight: bold; font-size: 0.9rem; display: none; margin-bottom: 10px; }
+    </style>
+</head>
+<body>
+
+<div class="quiz-card">
+    <div id="quiz-ui">
+        <div class="header">
+            <div>
+                <h2 style="margin:0; font-size: 1.3rem;">Advanced Aerodynamics Exam</h2>
+                <div id="q-count">Loading Question...</div>
+            </div>
+            <div id="timer">30:00</div>
+        </div>
+        <div class="progress-track"><div id="progress-fill"></div></div>
+        <div class="content">
+            <div id="is-skipped" class="skipped-tag">REVIEWING SKIPPED QUESTION</div>
+            <div class="category" id="cat-label">Topic</div>
+            <div class="question" id="q-text">Parsing Question...</div>
+            <div class="options-grid" id="opt-container"></div>
+            <div class="explanation" id="feedback"></div>
+            <div class="footer">
+                <button id="skip-btn">SKIP & REVISIT</button>
+                <button id="submit-btn">SUBMIT ANSWER</button>
+                <button id="next-btn">CONTINUE</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="results">
+        <h1 style="font-size: 2.5rem; color: var(--primary);">Exam Result</h1>
+        <div style="font-size: 5rem; font-weight: 900; margin: 30px 0; color: var(--success);" id="score-text">0 / 30</div>
+        <h2 id="percent-text">0%</h2>
+        <p id="summary-text" style="color: #666; font-size: 1.2rem;"></p>
+        <button onclick="location.reload()" style="background:var(--primary); color:white; width: auto; padding: 20px 60px; margin-top:30px;">RETAKE ASSESSMENT</button>
+    </div>
+</div>
+
+<script>
+// Data carefully constructed from the provided "Center of Pressure" document.
+// Correct answers are rotated (Index 0-3) to ensure no repeats on consecutive questions.
+const dataset = [
+    { c: "Definitions", q: "The Center of Pressure (CP) is specifically defined as the point on an airfoil where:", o: ["The total weight distribution is balanced", "The line of equivalent force cuts the chord", "The boundary layer airflow becomes turbulent", "The maximum thickness of the wing is found"], a: 1, e: "The CP is the point where the line of the single equivalent force cuts the chord." },
+    { c: "CP Movement", q: "What is the typical movement of the Center of Pressure as the Angle of Attack increases in normal flight?", o: ["The CP moves gradually forward", "The CP remains in a fixed spot", "The CP moves rapidly aftward", "The CP shifts toward the tip"], a: 0, e: "Tests show that as the AoA is increased, the Center of Pressure moves gradually forward." },
+    { c: "Stability", q: "Which force is described as acting through the aircraft's Center of Gravity (CG)?", o: ["The total lift of the wing", "The thrust of the propeller", "The weight of the aircraft", "The total drag of the frame"], a: 2, e: "Weight acts vertically downward through the centre of gravity (CG)." },
+    { c: "Stall Dynamics", q: "What occurs to the Center of Pressure when an airfoil is increased well beyond the normal flight Angle of Attack?", o: ["It continues moving forward", "It remains at the lead edge", "It reaches a neutral center", "It begins to move aft again"], a: 3, e: "At a point beyond ordinary flight (stall), the CP begins to move back again." },
+    { c: "Induced Drag", q: "Induced drag is a direct aerodynamic consequence of which of the following processes?", o: ["Air being deflected downward", "Air being compressed at nose", "Air leaking through the skin", "Air heating up over the wing"], a: 0, e: "Induced drag is a consequence of the airflow being deflected downwards at the wingtips to create lift." },
+    { c: "Speed Relationships", q: "According to the inverse relationship, how does induced drag change as airspeed increases?", o: ["It increases by the airspeed", "It decreases significantly", "It remains totally constant", "It doubles with every knot"], a: 1, e: "Induced drag is inversely proportional to the square of the airspeed; it decreases as speed increases." },
+    { c: "Stall Dynamics", q: "The aircraft nose pitches downward suddenly during a stall because the Center of Pressure:", o: ["Moves to the fuselage center", "Shifts toward the wing tips", "Moves back far enough aft", "Disappears from the wing"], a: 2, e: "When the CP moves back far enough, the nose will pitch downward suddenly during a stall." },
+    { c: "Induced Drag", q: "Which aerodynamic phenomenon directly contributes to the creation of induced drag at the wingtips?", o: ["Wingtip vortices", "Laminar flow separation", "Skin friction layers", "Propeller slipstream"], a: 0, e: "Downwash creates wingtip vortices, which contribute to induced drag." },
+    { c: "Angle of Attack", q: "At slower airspeeds, what adjustment must an aircraft make to generate the same lift as at higher airspeeds?", o: ["Maintain a neutral attitude", "Lower the wing flaps fully", "Decrease the angle of attack", "Increase the angle of attack"], a: 3, e: "At slower speeds, an aircraft needs a higher angle of attack to generate the required lift." },
+    { c: "Design Features", q: "Which wing design is most effective at reducing the production of induced drag?", o: ["A long and narrow wing", "A short and broad wing", "A thick and heavy wing", "A swept and jagged wing"], a: 0, e: "Less induced drag results from a long, narrow wing as compared to a short, broad wing." },
+    { c: "Induced Drag", q: "In which phase of flight is induced drag considered a more significant factor in overall drag?", o: ["During high speed cruise", "During takeoff and landing", "During a high speed dive", "During ground taxiing"], a: 1, e: "During takeoff and landing, where airspeed is low, induced drag is a more significant factor." },
+    { c: "Design Features", q: "What modern design feature is specifically mentioned as effective for reducing induced drag?", o: ["Retractable landing gear", "Heated leading edges", "Aerodynamic winglets", "External fuel tanks"], a: 2, e: "It has also been found that winglets are effective in reducing induced drag." },
+    { c: "Definitions", q: "The Center of Pressure is defined using the distribution of what around the body?", o: ["The total weight profile", "The internal fuel volume", "The structural load stress", "The pressure distribution"], a: 3, e: "The CP is defined using the pressure distribution around the body instead of weight." },
+    { c: "Lift Physics", q: "To support an aeroplane's weight, what must the wing do to the air passing over it?", o: ["Push large volumes upward", "Push large volumes downward", "Stop all air movement", "Heat the air volume"], a: 1, e: "To support an aeroplane's weight, a large volume of air must be pushed downward." },
+    { c: "Speed Relationships", q: "Why does the rearward inclination of lift decrease as the aircraft speed increases?", o: ["The angle of attack is smaller", "The engine thrust is higher", "The weight is reduced", "The wing becomes stiffer"], a: 0, e: "At higher speeds, the aircraft can maintain lift with a smaller AoA, leading to less rearward inclination of lift." },
+    { c: "Vortices", q: "A higher angle of attack at low speeds results in which change to wingtip vortices?", o: ["Weaker wingtip vortices", "Stronger wingtip vortices", "Neutral wingtip vortices", "No wingtip vortices"], a: 1, e: "A higher angle of attack means stronger wingtip vortices and more induced drag." },
+    { c: "Pitching Moments", q: "The downward pitching of the nose in a stall is primarily caused by the relationship between:", o: ["Thrust and weight", "CP and CG position", "Drag and lift ratio", "Span and chord length"], a: 1, e: "The shift of the CP relative to the CG causes the pitching moment described in the text." },
+    { c: "Definitions", q: "What is another common term used to describe the 'Center of Pressure'?", o: ["The center of gravity", "The center of lift", "The center of drag", "The center of mass"], a: 1, e: "The center of pressure or center of lift is defined just like the center of gravity." },
+    { c: "Induced Drag", q: "Mathematically, induced drag is inversely proportional to what specific value?", o: ["The total aircraft weight", "The square of the airspeed", "The total wing surface area", "The engine horsepower"], a: 1, e: "Induced drag is inversely proportional to the square of the airspeed." },
+    { c: "CP Movement", q: "As the wing changes its angle to the oncoming flow of air, the center of pressure:", o: ["Moves back and forth", "Remains at 25% chord", "Locks at the spar line", "Moves to the wing root"], a: 0, e: "The center of pressure moves back and forth along the surface of the wing." },
+    { c: "Forces", q: "Which force provides the necessary forward motion of the aircraft?", o: ["Vertical Lift", "Horizontal Thrust", "Rearward Drag", "Downward Weight"], a: 1, e: "Thrust provides the forward motion of the aeroplane." },
+    { c: "Stability", q: "If the CP moves aft of the CG during a stall, the resulting moment will be:", o: ["A strong nose-up pitch", "A strong nose-down pitch", "A sudden left wing drop", "A total loss of thrust"], a: 1, e: "When the CP moves back (aft), the nose pitches downward suddenly." },
+    { c: "Speed Relationships", q: "At higher speeds, what happens to the downwash deflection at the wingtips?", o: ["It increases significantly", "It remains constant", "It decreases in magnitude", "It reverses direction"], a: 2, e: "At higher speeds, a smaller AoA leads to less airflow deflection (downwash)." },
+    { c: "Vortices", q: "Wingtip vortices are a direct byproduct of the air being deflected to create:", o: ["Thrust", "Gravity", "Lift", "Drag"], a: 2, e: "Vortices are a consequence of air being deflected downwards to create lift." },
+    { c: "Definitions", q: "The CP is the point where the line of pressure cuts which part of the airfoil?", o: ["The thickest spar", "The trailing edge", "The chord line", "The leading edge"], a: 2, e: "The point where this line cuts the chord of an airfoil is called the centre of pressure." },
+    { c: "Induced Drag", q: "Why is induced drag less important during high-speed cruise flight?", o: ["The wings are stronger", "The air is much colder", "The AoA is much lower", "The thrust is reduced"], a: 2, e: "At higher speeds, induced drag is less important because the required AoA is smaller." },
+    { c: "Airflow", q: "Downwash contributes to drag because it is associated with the creation of:", o: ["Boundary layer heat", "High pressure on top", "Wingtip vortices", "Engine backpressure"], a: 2, e: "This downwash creates wingtip vortices, which contribute to drag." },
+    { c: "Stability", q: "Gravity causes which force to act vertically toward the center of the earth?", o: ["Lift force", "Thrust force", "Weight force", "Drag force"], a: 2, e: "The weight... acts vertically downward toward the centre of the earth." },
+    { c: "Design Features", q: "A 'short, broad wing' is described in the text as having what effect on induced drag?", o: ["Less induced drag", "More induced drag", "Zero induced drag", "Variable induced drag"], a: 1, e: "A long, narrow wing has less drag compared to a short, broad wing." },
+    { c: "Speed Relationships", q: "If airspeed is doubled, the induced drag will theoretically:", o: ["Double in total value", "Stay the same value", "Increase by four times", "Decrease significantly"], a: 3, e: "Since it is inversely proportional to the square, doubling speed reduces induced drag significantly." }
+];
+
+// APPLICATION LOGIC
+let qPool = dataset.map((_, i) => i);
+let skipped = [];
+let solvedCount = 0;
+let score = 0;
+let timeLeft = 30 * 60;
+let selected = null;
+let currentQIdx = null;
+
+const timerDisplay = document.getElementById('timer');
+const qCountDisplay = document.getElementById('q-count');
+const catLabel = document.getElementById('cat-label');
+const qText = document.getElementById('q-text');
+const optContainer = document.getElementById('opt-container');
+const progressFill = document.getElementById('progress-fill');
+const skipTag = document.getElementById('is-skipped');
+const feedbackBox = document.getElementById('feedback');
+
+const submitBtn = document.getElementById('submit-btn');
+const skipBtn = document.getElementById('skip-btn');
+const nextBtn = document.getElementById('next-btn');
+
+function startTimer() {
+    const interval = setInterval(() => {
+        timeLeft--;
+        const m = Math.floor(timeLeft / 60);
+        const s = timeLeft % 60;
+        timerDisplay.innerText = `${m}:${s < 10 ? '0' : ''}${s}`;
+        if (timeLeft <= 0) { clearInterval(interval); endExam(); }
+    }, 1000);
+}
+
+function renderQuestion() {
+    selected = null;
+    feedbackBox.style.display = 'none';
+    nextBtn.style.display = 'none';
+    submitBtn.style.display = 'block';
+    skipBtn.style.display = 'block';
+
+    if (qPool.length > 0) {
+        currentQIdx = qPool[0];
+        skipTag.style.display = 'none';
+    } else if (skipped.length > 0) {
+        currentQIdx = skipped[0];
+        skipTag.style.display = 'block';
+    } else {
+        endExam();
+        return;
+    }
+
+    const q = dataset[currentQIdx];
+    qCountDisplay.innerText = `Question ${solvedCount + 1} / 30`;
+    catLabel.innerText = q.c;
+    qText.innerText = q.q;
+    optContainer.innerHTML = '';
+
+    q.o.forEach((txt, i) => {
+        const div = document.createElement('div');
+        div.className = 'option';
+        div.innerText = txt;
+        div.onclick = () => {
+            if (nextBtn.style.display === 'block') return;
+            document.querySelectorAll('.option').forEach(el => el.classList.remove('selected'));
+            div.classList.add('selected');
+            selected = i;
+        };
+        optContainer.appendChild(div);
+    });
+
+    progressFill.style.width = `${(solvedCount / 30) * 100}%`;
+}
+
+submitBtn.onclick = () => {
+    if (selected === null) return alert("Please select an answer.");
+    
+    const q = dataset[currentQIdx];
+    const opts = document.querySelectorAll('.option');
+    
+    // Remove from whichever pool it's in
+    if (qPool.length > 0) qPool.shift();
+    else skipped.shift();
+
+    if (selected === q.a) {
+        opts[selected].classList.add('correct-pure');
+        score++;
+    } else {
+        opts[selected].classList.add('incorrect');
+        opts[q.a].classList.add('correct-gold');
+    }
+
+    feedbackBox.innerHTML = `<strong>Technical Context:</strong> ${q.e}`;
+    feedbackBox.style.display = 'block';
+    submitBtn.style.display = 'none';
+    skipBtn.style.display = 'none';
+    nextBtn.style.display = 'block';
+    solvedCount++;
+};
+
+skipBtn.onclick = () => {
+    // Cyclic Logic: Move to end of skipped queue
+    if (qPool.length > 0) {
+        const idx = qPool.shift();
+        skipped.push(idx);
+    } else {
+        const idx = skipped.shift();
+        skipped.push(idx);
+    }
+    renderQuestion();
+};
+
+nextBtn.onclick = renderQuestion;
+
+function endExam() {
+    document.getElementById('quiz-ui').style.display = 'none';
+    document.getElementById('results').style.display = 'block';
+    document.getElementById('score-text').innerText = `${score} / 30`;
+    document.getElementById('percent-text').innerText = `${Math.round((score/30)*100)}%`;
+    
+    const sum = document.getElementById('summary-text');
+    if (score >= 24) sum.innerText = "Excellent. You have a superior grasp of Center of Pressure dynamics.";
+    else if (score >= 18) sum.innerText = "Good job. Review Induced Drag relationships to improve further.";
+    else sum.innerText = "Focus on the movement of CP during stalls and the inverse-square law of induced drag.";
+}
+
+// Initialize
+startTimer();
+renderQuestion();
+
+</script>
+</body>
+</html>
